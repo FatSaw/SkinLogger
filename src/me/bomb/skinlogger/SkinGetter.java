@@ -21,17 +21,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-class SkinGetter extends Thread {
+final class SkinGetter extends Thread {
 	private final static PublicKey publicKey;
-	private static AtomicInteger runcount = new AtomicInteger();
+	private static final AtomicInteger runcount = new AtomicInteger();
 	protected final static HashSet<SkinGetter> loaded = new HashSet<SkinGetter>();
 	private final UUID uuid;
-	protected int n;
+	protected final int n;
+	protected final short minimalgettime;
 	private boolean ok;
 	private CapeType cape;
 	private String value;
 	private String signature;
-	protected static short timeout = 500;
 	static {
 		PublicKey apublicKey = null;
 	    try {
@@ -40,9 +40,10 @@ class SkinGetter extends Thread {
 	    }
 	    publicKey = apublicKey;
 	}
-	protected SkinGetter(UUID uuid,int n) {
+	protected SkinGetter(UUID uuid,int n,short minimalgettime) {
 		this.uuid = uuid;
 		this.n = n;
+		this.minimalgettime = minimalgettime;
 		try {
 			start();
 			runcount.incrementAndGet();
@@ -155,13 +156,13 @@ class SkinGetter extends Thread {
 	private void sleepremain(long time) {
 		if(time!=-1L) {
 			try {
-				Thread.sleep(timeout);
+				Thread.sleep(minimalgettime);
 			} catch (InterruptedException e) {
 			}
 			return;
 		}
 		time = System.currentTimeMillis() - time;
-		short sleeptime = (short) (time<0?timeout:time>timeout?0:timeout-time);
+		short sleeptime = (short) (time<0?minimalgettime:time>minimalgettime?0:minimalgettime-time);
 		try {
 			Thread.sleep(sleeptime);
 		} catch (InterruptedException e) {
