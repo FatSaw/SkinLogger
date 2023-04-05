@@ -6,6 +6,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.util.Base64;
 import java.util.Date;
@@ -20,43 +21,109 @@ import com.dropbox.core.v2.DbxClientV2;
 import com.dropbox.core.v2.files.UploadBuilder;
 import com.dropbox.core.v2.files.WriteMode;
 
-public class SkinLogger {
-	private static final String ACCESS_TOKEN = "DROPBOX_ACCESS_TOKEN_HERE";
-	protected static final String path = "SKINLOGGER";
-	private final static byte getterthreads = 4;
-	private final static short timeout = 333;
+final class SkinLogger extends Thread {
+	private final String ACCESS_TOKEN;
+	private final String path;
+	private final byte getterthreads;
+	private final short minimalgettime;
+	private boolean getskins;
+	private boolean run;
+	private UUID[] uuids;
 
     public static void main(String[] args) {
-    	SkinGetter.timeout = timeout;
-		new Thread() {
-			public void run() {
-				while (true) {
-					int i = readlast();
-					UUID[] uuids = readUUIDS();
-					while(i < uuids.length) {
-						try {
-							Thread.sleep(100);
-						} catch (InterruptedException e) {
-						}
-						while(SkinGetter.runcount()<getterthreads) {
-							new SkinGetter(uuids[i],i);
-							++i;
-						}
-						save(uuids.length);
-					}
-					try {
-						Thread.sleep(timeout);
-					} catch (InterruptedException e) {
-					}
-					save(uuids.length);
-					writelast(0);
-					zip();
-					syncdropbox();
+    	SkinLogger skinlogger = new SkinLogger("DROPBOX_API_KEY_HERE","SKINLOGGER",(byte)4,(short)350);
+    	skinlogger.start();
+    	BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+    	boolean run = true;
+    	while(skinlogger.isAlive()) {
+    		try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+			}
+    		if(run) {
+    			try {
+    				if(reader.ready()) {
+    					String cmd = reader.readLine();
+    					if(cmd!=null) {
+    						if(cmd.equals("getskins 0")) {
+    							skinlogger.getskins=false;
+    							System.out.println("Skin get disabled!");
+    						}
+    						if(cmd.equals("getskins 1")) {
+    							skinlogger.getskins=true;
+    							System.out.println("Skin get enabled!");
+    						}
+    						if(cmd.equals("stop")) {
+    							skinlogger.getskins=false;
+    							skinlogger.end();
+    							reader.close();
+    							System.out.println("Stopping...");
+    							run = false;
+    						}
+    					}
+    				}
+    			} catch (IOException e) {
+    			}
+    		}
+    	}
+    	System.out.println("Stopped by stop command!");
+	}
+    protected SkinLogger(String ACCESS_TOKEN,String path,byte getterthreads,short minimalgettime) {
+    	this.ACCESS_TOKEN = ACCESS_TOKEN;
+    	this.path = path;
+    	this.getterthreads = getterthreads;
+    	this.minimalgettime = minimalgettime;
+    	this.getskins = true;
+	}
+    public void run() {
+    	run = true;
+		while (true) {
+			int i = readlast();
+			readUUIDS();
+			if(i >= uuids.length || i < 0) {
+				i=0;
+			}
+			while(i < uuids.length) {
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+				}
+				while(getskins&&SkinGetter.runcount()<getterthreads&&i<uuids.length) {
+					new SkinGetter(uuids[i],i,minimalgettime);
+					++i;
+				}
+				int n = save(uuids.length);
+				if(n!=Integer.MAX_VALUE) {
+					writelast(n);
+				}
+				if(!run&&!getskins) {
+					break;
 				}
 			}
-		}.start();
+			byte w=0;
+			while(SkinGetter.runcount()!=0&&w!=-1) {
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+				}
+				++w;
+			}
+			save(uuids.length);
+			if(!run) {
+				return;
+			}
+			writelast(0);
+			zip();
+			syncdropbox();
+		}
 	}
-	private static int readlast() {
+    //protected void getskins(boolean getskins) {
+    //	this.getskins = getskins;
+    //}
+    protected void end() {
+    	run = false;
+    }
+	private int readlast() {
 		int last = 0;
 		try {
 			BufferedReader slnreader = new BufferedReader(new FileReader(path + File.separator + "LAST.txt"));
@@ -67,10 +134,9 @@ public class SkinLogger {
 		}
 		return last;
 	}
-	private static void writelast(int index) {
+	private void writelast(int index) {
 		try {
-			try(FileWriter writer = new FileWriter(path + File.separator + "LAST.txt", false))
-	        {
+			try(FileWriter writer = new FileWriter(path + File.separator + "LAST.txt", false)) {
 	            writer.write(String.valueOf(index));
 	            writer.flush();
 	            writer.close();
@@ -78,7 +144,7 @@ public class SkinLogger {
 		} catch (IOException e) {
 		}
 	}
-	private static UUID[] readUUIDS () {
+	private void readUUIDS () {
 		HashSet<UUID> lines = new HashSet<UUID>();
 		try {
 			BufferedReader reader = new BufferedReader(new FileReader(path + File.separator + "UUIDS.txt"));
@@ -93,9 +159,9 @@ public class SkinLogger {
 			reader.close();
 		} catch (IOException e) {
 		}
-		return lines.toArray(new UUID[lines.size()]);
+		this.uuids = lines.toArray(new UUID[lines.size()]);
 	}
-	private static void syncdropbox() {
+	private void syncdropbox() {
         File file = new File(path + File.separator + "SKINLOGGER.zip");
         if(file.isFile()) {
         	System.out.println("START SYNCHRONIZATION");
@@ -113,10 +179,8 @@ public class SkinLogger {
         } else {
         	System.out.println("SKIP SYNCHRONIZATION");
         }
-        
-		
 	}
-	private static void zip() {
+	private void zip() {
 		try {
 			System.out.println("START ZIPPING");
 			File file = new File(path + File.separator + "SKINLOGGER.zip");
@@ -149,9 +213,10 @@ public class SkinLogger {
 			e.printStackTrace();
 		}
     }
-	private static void save(int length) {
+	private int save(int length) {
 		HashSet<SkinGetter> removesgs = new HashSet<SkinGetter>();
 		synchronized (SkinGetter.loaded) {
+			int j = Integer.MAX_VALUE;
 			for(SkinGetter skingetter : SkinGetter.loaded) {
 				removesgs.add(skingetter);
 				int n = skingetter.n;
@@ -222,9 +287,12 @@ public class SkinLogger {
     				}
     				++o;
     			}
-				writelast(n);
+				if(j>n) {
+    				j=n;
+    			}
 			}
 			SkinGetter.loaded.removeAll(removesgs);
+			return j;
 		}
 	}
 }
