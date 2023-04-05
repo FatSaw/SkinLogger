@@ -12,4 +12,4 @@ Utility for logging minecraft skins with cape
 4.Fill the UUIDS.txt file with the UUIDs of the players
 
 ## Links
-My archive of rare capes: [SKINLOGGER.zip](https://www.dropbox.com/s/zaelm03rvdm4mxb/SKINLOGGER.zip?dl=1) (updates every 2-6 hours automatically)
+Archive of skins with capes: [SKINLOGGER.zip](https://www.dropbox.com/s/zaelm03rvdm4mxb/SKINLOGGER.zip?dl=1) (updates every 2-6 hours automatically)
