@@ -205,40 +205,6 @@ final class SkinLogger extends Thread {
 		System.out.println("START ZIPPING");
 		pack("SKINLOGGER.zip");
 		System.out.println("END ZIPPING");
-		/*try {
-			System.out.println("START ZIPPING");
-			File file = new File(path + File.separator + "SKINLOGGER.zip");
-			if(file.exists()) {
-				file.delete();
-			}
-			file.createNewFile();
-			ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(file.toPath()));
-	        zipOutputStream.setMethod(8);
-	        zipOutputStream.setLevel(5);
-	        File workingdirectory = new File(path);
-	        for (File capedirectory : workingdirectory.listFiles()){
-	        	String capedirectoryname = null;
-	            if (!capedirectory.isDirectory() || CapeType.valueOf(capedirectoryname = capedirectory.getName())==null) {
-	            	continue;
-	            }
-	            for (File skinfile : capedirectory.listFiles()){
-            		String skinfileentry = null;
-            		if (!skinfile.isFile() || !(skinfileentry = capedirectoryname.concat("/").concat(skinfile.getName())).endsWith(".skin")) {
-            			continue;
-            		}
-                    try {
-                        zipOutputStream.putNextEntry(new ZipEntry(skinfileentry));
-                        Files.copy(skinfile.toPath(), zipOutputStream);
-                        zipOutputStream.closeEntry();
-                    } catch (IOException e) {
-                    }
-            	}
-	        }
-	        zipOutputStream.close();
-			System.out.println("END ZIPPING");
-		} catch (IOException e) {
-			e.printStackTrace();
-		}*/
     }
 	private void pack(String archivename) {
 		File workingdir = new File(path);
