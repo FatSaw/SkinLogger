@@ -7,13 +7,12 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.Files;
-import java.util.Base64;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.UUID;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import com.dropbox.core.DbxException;
 import com.dropbox.core.DbxRequestConfig;
@@ -35,6 +34,7 @@ final class SkinLogger extends Thread {
     	skinlogger.start();
     	BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
     	boolean run = true;
+		System.out.println("Starting...!");
     	while(skinlogger.isAlive()) {
     		try {
 				Thread.sleep(1000);
@@ -45,13 +45,37 @@ final class SkinLogger extends Thread {
     				if(reader.ready()) {
     					String cmd = reader.readLine();
     					if(cmd!=null) {
-    						if(cmd.equals("getskins 0")) {
+    						if(cmd.equals("pause")) {
     							skinlogger.getskins=false;
     							System.out.println("Skin get disabled!");
     						}
-    						if(cmd.equals("getskins 1")) {
+    						if(cmd.equals("start")) {
     							skinlogger.getskins=true;
     							System.out.println("Skin get enabled!");
+    						}
+    						if(cmd.equals("pack")) {
+    							boolean enabledget = skinlogger.getskins;
+    							if(enabledget) {
+    								skinlogger.getskins = false;
+        							System.out.println("Skin get disabled!");
+    							}
+    							skinlogger.pack("CAPE_SKINS.zip");
+    							if(enabledget) {
+    								skinlogger.getskins = true;
+        							System.out.println("Skin get enabled!");
+    							}
+    						}
+    						if(cmd.equals("count")) {
+    							boolean enabledget = skinlogger.getskins;
+    							if(enabledget) {
+    								skinlogger.getskins = false;
+        							System.out.println("Skin get disabled!");
+    							}
+    							skinlogger.count();
+    							if(enabledget) {
+    								skinlogger.getskins = true;
+        							System.out.println("Skin get enabled!");
+    							}
     						}
     						if(cmd.equals("stop")) {
     							skinlogger.getskins=false;
@@ -117,9 +141,6 @@ final class SkinLogger extends Thread {
 			syncdropbox();
 		}
 	}
-    //protected void getskins(boolean getskins) {
-    //	this.getskins = getskins;
-    //}
     protected void end() {
     	run = false;
     }
@@ -163,25 +184,28 @@ final class SkinLogger extends Thread {
 	}
 	private void syncdropbox() {
         File file = new File(path + File.separator + "SKINLOGGER.zip");
-        if(file.isFile()) {
-        	System.out.println("START SYNCHRONIZATION");
-        	DbxRequestConfig config = DbxRequestConfig.newBuilder("dropbox/java-tutorial").build();
-            DbxClientV2 client = new DbxClientV2(config, ACCESS_TOKEN);
-        	try (InputStream in = new FileInputStream(file)) {
-        		UploadBuilder metadata = client.files().uploadBuilder("/" + file.getName());
-                metadata.withMode(WriteMode.OVERWRITE);
-                metadata.withClientModified(new Date(file.lastModified()));
-                metadata.withAutorename(false);
-                metadata.uploadAndFinish(in);
-            } catch (IOException | DbxException e) {
-    		}
-        	System.out.println("END SYNCHRONIZATION");
-        } else {
+        if(!file.isFile()) {
         	System.out.println("SKIP SYNCHRONIZATION");
+        	return;
         }
+        System.out.println("START SYNCHRONIZATION");
+    	DbxRequestConfig config = DbxRequestConfig.newBuilder("dropbox/java-tutorial").build();
+        DbxClientV2 client = new DbxClientV2(config, ACCESS_TOKEN);
+    	try (InputStream in = new FileInputStream(file)) {
+    		UploadBuilder metadata = client.files().uploadBuilder("/" + file.getName());
+            metadata.withMode(WriteMode.OVERWRITE);
+            metadata.withClientModified(new Date(file.lastModified()));
+            metadata.withAutorename(false);
+            metadata.uploadAndFinish(in);
+        } catch (IOException | DbxException e) {
+		}
+    	System.out.println("END SYNCHRONIZATION");
 	}
 	private void zip() {
-		try {
+		System.out.println("START ZIPPING");
+		pack("SKINLOGGER.zip");
+		System.out.println("END ZIPPING");
+		/*try {
 			System.out.println("START ZIPPING");
 			File file = new File(path + File.separator + "SKINLOGGER.zip");
 			if(file.exists()) {
@@ -191,28 +215,101 @@ final class SkinLogger extends Thread {
 			ZipOutputStream zipOutputStream = new ZipOutputStream(Files.newOutputStream(file.toPath()));
 	        zipOutputStream.setMethod(8);
 	        zipOutputStream.setLevel(5);
-	        File dir1 = new File(path);
-	        for (File dir2 : dir1.listFiles()){
-	            if (dir2.isDirectory()) {
-	            	for (File dir3 : dir2.listFiles()){
-	            		if (dir3.isFile()) {
-	            			ZipEntry zipEntry = new ZipEntry(dir2.getName() + "/" + dir3.getName().toString());
-	                        try {
-	                            zipOutputStream.putNextEntry(zipEntry);
-	                            Files.copy(dir3.toPath(), zipOutputStream);
-	                            zipOutputStream.closeEntry();
-	                        } catch (IOException e) {
-	                        }
-	            		}
-	            	}
+	        File workingdirectory = new File(path);
+	        for (File capedirectory : workingdirectory.listFiles()){
+	        	String capedirectoryname = null;
+	            if (!capedirectory.isDirectory() || CapeType.valueOf(capedirectoryname = capedirectory.getName())==null) {
+	            	continue;
 	            }
+	            for (File skinfile : capedirectory.listFiles()){
+            		String skinfileentry = null;
+            		if (!skinfile.isFile() || !(skinfileentry = capedirectoryname.concat("/").concat(skinfile.getName())).endsWith(".skin")) {
+            			continue;
+            		}
+                    try {
+                        zipOutputStream.putNextEntry(new ZipEntry(skinfileentry));
+                        Files.copy(skinfile.toPath(), zipOutputStream);
+                        zipOutputStream.closeEntry();
+                    } catch (IOException e) {
+                    }
+            	}
 	        }
 	        zipOutputStream.close();
 			System.out.println("END ZIPPING");
 		} catch (IOException e) {
 			e.printStackTrace();
-		}
+		}*/
     }
+	private void pack(String archivename) {
+		File workingdir = new File(path);
+		File zipfile = new File(path, archivename);
+		System.out.print("Reading files... ");
+		HashMap<UUID, HashSet<SkinData>> unsortedskins = ArchivePacker.getplayerskins(workingdir);
+    	System.out.println("OK!");
+    	System.out.print("Sorting... ");
+		HashMap<UUID, EnumMap<CapeType, ArrayList<SkinData>>> sortedskins = ArchivePacker.sortplayerskins(unsortedskins);
+    	System.out.println("OK!");
+    	System.out.print("Packing ".concat(zipfile.getPath()).concat(" ... "));
+        int errcount = ArchivePacker.pack(zipfile, sortedskins);
+        if(errcount==-1) {
+        	System.out.println("FAILED!");
+        } else if(errcount==0) {
+        	System.out.println("OK!");
+        } else {
+        	System.out.println("OK! ERRORS: ".concat(Integer.toString(errcount)));
+        }
+	}
+	private void count() {
+		File workingdir = new File(path);
+		System.out.print("Reading files... ");
+		HashMap<UUID, HashSet<SkinData>> unsortedskins = ArchivePacker.getplayerskins(workingdir);
+    	System.out.println("OK!");
+    	System.out.print("Sorting... ");
+		HashMap<UUID, EnumMap<CapeType, ArrayList<SkinData>>> sortedskins = ArchivePacker.sortplayerskins(unsortedskins);
+    	System.out.println("OK!");
+    	unsortedskins=null;
+        EnumMap<CapeType,Long> capecounts = new EnumMap<CapeType,Long>(CapeType.class);
+        long totalcapes = 0;
+        long totaluniccapes = 0;
+        for(UUID uuid : sortedskins.keySet()) {
+        	EnumMap<CapeType, ArrayList<SkinData>> capemap = sortedskins.get(uuid);
+        	for(CapeType capetype : capemap.keySet()) {
+        		ArrayList<SkinData> sorteddata = capemap.get(capetype);
+        		int sortedsize = sorteddata.size();
+        		long capecount = capecounts.containsKey(capetype) ? capecounts.get(capetype) : 0L,uniccapecount = capecount;
+        		capecount&=0x00000000FFFFFFFFL;
+        		uniccapecount&=0xFFFFFFFF00000000L;
+        		uniccapecount = uniccapecount>>32;
+        		capecount+=sortedsize;
+        		totalcapes+=sortedsize;
+        		uniccapecount+=sortedsize;
+        		totaluniccapes+=sortedsize;
+        		--uniccapecount;
+        		--totaluniccapes;
+        		capecount|=uniccapecount<<32;
+        		capecounts.put(capetype, Long.valueOf(capecount));
+        	}
+        }
+        sortedskins=null;
+        StringBuffer sb = new StringBuffer("Cape_name: count|uniccount\n");
+        sb.append("Total: ");
+        sb.append(totalcapes);
+        sb.append("|");
+        sb.append(totaluniccapes);
+        for(CapeType capetype : capecounts.keySet()) {
+        	sb.append("\n");
+        	sb.append(capetype.name());
+        	sb.append(": ");
+        	long capecount = capecounts.get(capetype),uniccapecount = capecount;
+        	capecount&=0x00000000FFFFFFFFL;
+    		uniccapecount&=0xFFFFFFFF00000000L;
+    		uniccapecount = uniccapecount>>32;
+        	sb.append(capecount);
+	        sb.append("|");
+	        sb.append(uniccapecount);
+        }
+		System.out.println(sb.toString());
+	}
 	private int save(int length) {
 		HashSet<SkinGetter> removesgs = new HashSet<SkinGetter>();
 		synchronized (SkinGetter.loaded) {
@@ -236,50 +333,47 @@ final class SkinLogger extends Thread {
 					continue;
 				}
     			System.out.print("! GET: OK! CAPE: ");
-				CapeType cape = skingetter.getCape();
-				String value = skingetter.getValue();
-				String data = value.concat(":").concat(skingetter.getSignature());
-    			System.out.print(cape.name());
-    			File capedir = new File(path + File.separator + cape.name() + File.separator);
+				SkinData skindata = skingetter.getSkinData();
+				String skinurl = skindata.skinurl;
+				String capeurl = skindata.capeurl;
+				CapeType capetype = skindata.capetype;
+    			System.out.print(capetype.name());
+    			File capedir = new File(path + File.separator + capetype.name() + File.separator);
     			if(!capedir.exists()) {
         			capedir.mkdirs();
     			}
     			short o = 1;
-    			File oldfile = null;
+    			File previousfile = null;
     			while(o<Short.MAX_VALUE) {
     				File file = new File(capedir,Short.toString(o).concat("_").concat(uuid.toString()).concat(".skin"));
     				if(file.exists()) {
-    					oldfile = file;
+    					previousfile = file;
     				} else {
     					o=Short.MAX_VALUE;
             			System.out.print("! CHANGES: ");
-    					if(oldfile!=null) {
-            				try {
-            					BufferedReader reader = new BufferedReader(new FileReader(oldfile));
-            					String readedline = reader.readLine();
-            					reader.close();
-	            				String previousvalue = readedline.substring(0, readedline.length()-685);
-	            				String decodedvalue = new String(Base64.getDecoder().decode(value));
-	            				String previousdecodedvalue = new String(Base64.getDecoder().decode(previousvalue));
-	            				if(previousdecodedvalue.substring(previousdecodedvalue.indexOf("  \"textures\" : {")).equals(decodedvalue.substring(decodedvalue.indexOf("  \"textures\" : {")))) {
-	            					System.out.println("NO!");
+    					if(previousfile!=null) {
+    						try {
+    							SkinData previousdata = SkinData.read(previousfile);
+    							String previousskinurl = previousdata.skinurl;
+    							String previouscapeurl = previousdata.capeurl;
+    							CapeType previouscapetypel = previousdata.capetype;
+    							if(skinurl.equals(previousskinurl)&&(capetype==previouscapetypel||capeurl.equals(previouscapeurl))) {
+    								System.out.println("NO!");
 	            					break;
-	            				} else {
+    							} else {
 	            					System.out.print("YES!");
 	            				}
-            				} catch (NullPointerException | IndexOutOfBoundsException | IOException e1) {
-            					System.out.println("FILED TO CHECK!");
+    						} catch (IllegalArgumentException|NullPointerException|IndexOutOfBoundsException|IOException e) {
+    							System.out.println("FILED TO CHECK!");
             					break;
-            				}
+    						}
     					} else {
         					System.out.print("FIRST RUN!");
     					}
-    					try(FileWriter writer = new FileWriter(file, false)) {
-            	            writer.write(data);
-            	            writer.flush();
-            	            writer.close();
+    					try{
+        					skindata.write(file);
         					System.out.println(" SAVE: OK!");
-            	        } catch(IOException ex) {
+    					} catch(IOException ex) {
         					System.out.println(" SAVE: FILED!");
             	            System.out.println(ex.getMessage());
             	        }
